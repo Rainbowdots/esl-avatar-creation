@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CREATE YOUR OWN AVATAR - English Learning Game</title>
+  <meta name="description" content="Free browser-based Avatar creator and English reading & speaking game for Taiwan 7th graders. No login, no backend, works 100% offline." />
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS CDN for zero-build standalone portability -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            display: ['Syne', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    @keyframes bounceSmall {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+    .animate-bounce-sm { animation: bounceSmall 1.5s infinite; }
+  </style>
+<script src="/_aistudio-iframe.js?v=2c34bde1"></script></head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- Header -->
+  <header class="sticky top-0 z-40 bg-slate-900/90 border-b border-slate-800 backdrop-blur px-4 sm:px-6 py-3.5 flex items-center justify-between">
+    <div class="flex items-center gap-2 cursor-pointer" onclick="goToStep('start')">
+      <span class="text-indigo-400 text-xl">✨</span>
+      <span class="text-base sm:text-lg font-black tracking-tight text-white uppercase">AVATAR CREATOR</span>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <button id="levelToggleBtn" onclick="toggleLevel()" class="px-3 py-1 rounded-lg text-xs font-bold border border-indigo-500/40 bg-indigo-600/20 text-indigo-300">
+        LEVEL 1: EASY ENGLISH
+      </button>
+      <button onclick="toggleTeacherMeetModal(true)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5">
+        <span>📹</span>
+        <span class="hidden sm:inline">Google Meet Tips</span>
+      </button>
+      <button onclick="goToStep('start')" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs" title="Restart">
+        🔄
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main id="appContainer" class="flex-1 flex flex-col justify-center px-4 py-4 sm:py-8 max-w-5xl mx-auto w-full">
+    <!-- Dynamic Step Screen Loaded Here -->
+  </main>
+
+  <!-- Teacher Google Meet Modal -->
+  <div id="teacherModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl relative">
+      <button onclick="toggleTeacherMeetModal(false)" class="absolute top-5 right-5 p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white">
+        ✕
+      </button>
+      <div id="teacherModalContent"></div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="py-4 border-t border-slate-800 text-center text-xs text-slate-500">
+    CREATE YOUR OWN AVATAR · 100% Free · No Login Required · Taiwan Grade 7 English
+  </footer>
+
+  <script>
+    // Audio Context Synthesizer
+    let audioCtx = null;
+    function getAudioCtx() {
+      if (!audioCtx) {
+        const AudioClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioClass) audioCtx = new AudioClass();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      return audioCtx;
+    }
+
+    function playSelectSound() {
+      try {
+        const ctx = getAudioCtx();
+        if (!ctx) return;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.setValueAtTime(440, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.1, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.09);
+      } catch (e) {}
+    }
+
+    function playSuccessChime() {
+      try {
+        const ctx = getAudioCtx();
+        if (!ctx) return;
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.08);
+          gain.gain.setValueAtTime(0.12, ctx.currentTime + idx * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.08 + 0.35);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + idx * 0.08);
+          osc.stop(ctx.currentTime + idx * 0.08 + 0.36);
+        });
+      } catch (e) {}
+    }
+
+    function playCelebrateSound() {
+      try {
+        const ctx = getAudioCtx();
+        if (!ctx) return;
+        [440, 554.37, 659.25, 880, 1108.73].forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.09);
+          gain.gain.setValueAtTime(0.15, ctx.currentTime + idx * 0.09);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.09 + 0.5);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + idx * 0.09);
+          osc.stop(ctx.currentTime + idx * 0.09 + 0.55);
+        });
+      } catch (e) {}
+    }
+
+    // Native Speech Synthesis
+    function speakText(text, onEnd) {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'en-US';
+      u.rate = 0.85;
+      const voices = window.speechSynthesis.getVoices();
+      const voice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Samantha'))) || voices.find(v => v.lang.startsWith('en'));
+      if (voice) u.voice = voice;
+      if (onEnd) {
+        u.onend = onEnd;
+        u.onerror = onEnd;
+      }
+      window.speechSynthesis.speak(u);
+    }
+
+    // Game State
+    let currentLevel = 1;
+    let currentStep = 'start';
+    let avatar = {
+      faceShape: 'round',
+      skinTone: 'fair',
+      eyeSize: 'big',
+      eyeColor: 'blue',
+      hairLength: 'short',
+      hairColor: 'black',
+      mouthType: 'big-smile',
+      clothesType: 'hoodie',
+      clothesColor: 'red',
+      accessoryType: 'none',
+      personalityReason: 'cool'
+    };
+
+    function toggleLevel() {
+      playSelectSound();
+      currentLevel = currentLevel === 1 ? 2 : 1;
+      updateHeaderLevelButton();
+      render();
+    }
+
+    function updateHeaderLevelButton() {
+      const btn = document.getElementById('levelToggleBtn');
+      if (currentLevel === 1) {
+        btn.className = 'px-3 py-1 rounded-lg text-xs font-bold border border-indigo-500/40 bg-indigo-600/20 text-indigo-300';
+        btn.textContent = 'LEVEL 1: EASY ENGLISH';
+      } else {
+        btn.className = 'px-3 py-1 rounded-lg text-xs font-bold border border-amber-500/40 bg-amber-600/20 text-amber-300';
+        btn.textContent = 'LEVEL 2: CHALLENGE';
+      }
+    }
+
+    function goToStep(step) {
+      playSelectSound();
+      currentStep = step;
+      render();
+    }
+
+    // Avatar SVG Generator
+    function getAvatarSVG(av, sizeClass = "w-64 h-64") {
+      const skinColors = {
+        fair: { base: '#FDDEC4', shadow: '#EABFA2' },
+        warm: { base: '#F4BA89', shadow: '#D89966' },
+        tan: { base: '#C78953', shadow: '#9F6335' },
+        deep: { base: '#7C4F2B', shadow: '#563116' }
+      }[av.skinTone];
+
+      const hairColors = {
+        black: { base: '#1C1917', highlight: '#44403C' },
+        brown: { base: '#5C3826', highlight: '#8C5638' },
+        blonde: { base: '#EAB308', highlight: '#FDE047' }
+      }[av.hairColor];
+
+      const eyeColors = {
+        blue: '#2563EB',
+        brown: '#6B4226',
+        green: '#059669'
+      }[av.eyeColor];
+
+      const clothesColors = {
+        red: '#DC2626',
+        blue: '#2563EB',
+        black: '#1E293B',
+        white: '#F8FAFC',
+        green: '#16A34A'
+      }[av.clothesColor];
+
+      let facePath = '<path d="M 105 130 C 105 85, 215 85, 215 130 C 215 205, 195 240, 160 240 C 125 240, 105 205, 105 130 Z" fill="' + skinColors.base + '" />';
+      if (av.faceShape === 'square') {
+        facePath = '<path d="M 105 130 C 105 85, 215 85, 215 130 C 215 190, 205 230, 175 238 C 160 242, 145 238, 115 230 C 105 190, 105 130, 105 130 Z" fill="' + skinColors.base + '" />';
+      }
+
+      let clothesSVG = '';
+      if (av.clothesType === 't-shirt') {
+        clothesSVG = '<path d="M 80 300 L 95 240 Q 160 220 225 240 L 240 300 Z" fill="' + clothesColors + '" />' +
+                     '<path d="M 132 230 Q 160 258 188 230" fill="none" stroke="#FFFFFF" stroke-width="3" opacity="0.6" />';
+      } else if (av.clothesType === 'hoodie') {
+        clothesSVG = '<path d="M 76 300 L 90 236 Q 160 216 230 236 L 244 300 Z" fill="' + clothesColors + '" />' +
+                     '<path d="M 120 230 Q 160 265 200 230 Z" fill="#0F172A" opacity="0.3" />' +
+                     '<line x1="146" y1="250" x2="144" y2="284" stroke="#FFF" stroke-width="2.5" />' +
+                     '<line x1="174" y1="250" x2="176" y2="284" stroke="#FFF" stroke-width="2.5" />';
+      } else if (av.clothesType === 'jacket') {
+        clothesSVG = '<path d="M 120 235 L 120 300 L 200 300 L 200 235 Z" fill="#FFF" />' +
+                     '<path d="M 76 300 L 92 234 Q 160 220 228 234 L 244 300 L 195 300 L 175 245 L 145 245 L 125 300 Z" fill="' + clothesColors + '" />' +
+                     '<line x1="160" y1="252" x2="160" y2="300" stroke="#CBD5E1" stroke-width="2" stroke-dasharray="2 2" />';
+      } else {
+        clothesSVG = '<path d="M 76 300 L 92 236 Q 160 218 228 236 L 244 300 Z" fill="' + clothesColors + '" />' +
+                     '<path d="M 136 226 L 160 252 L 142 258 Z" fill="#FFF" />' +
+                     '<path d="M 184 226 L 160 252 L 178 258 Z" fill="#FFF" />' +
+                     '<path d="M 155 250 L 165 250 L 168 288 L 160 298 L 152 288 Z" fill="#DC2626" />';
+      }
+
+      let eyesSVG = '';
+      if (av.eyeSize === 'big') {
+        eyesSVG = '<ellipse cx="132" cy="152" rx="13" ry="14" fill="#FFF" /><circle cx="132" cy="152" r="8" fill="' + eyeColors + '" /><circle cx="132" cy="152" r="4" fill="#000" /><circle cx="135" cy="148" r="3" fill="#FFF" />' +
+                  '<ellipse cx="188" cy="152" rx="13" ry="14" fill="#FFF" /><circle cx="188" cy="152" r="8" fill="' + eyeColors + '" /><circle cx="188" cy="152" r="4" fill="#000" /><circle cx="191" cy="148" r="3" fill="#FFF" />';
+      } else {
+        eyesSVG = '<path d="M 121 153 Q 133 145 145 153 Q 133 158 121 153 Z" fill="#FFF" /><circle cx="133" cy="152" r="6" fill="' + eyeColors + '" /><circle cx="133" cy="152" r="3" fill="#000" />' +
+                  '<path d="M 175 153 Q 187 145 199 153 Q 187 158 175 153 Z" fill="#FFF" /><circle cx="187" cy="152" r="6" fill="' + eyeColors + '" /><circle cx="187" cy="152" r="3" fill="#000" />';
+      }
+
+      let mouthSVG = '<path d="M 142 190 Q 160 216 178 190 Z" fill="#991B1B" /><path d="M 145 191 Q 160 195 175 191" fill="#FFF" />';
+      if (av.mouthType === 'small-smile') {
+        mouthSVG = '<path d="M 147 194 Q 160 203 173 194" fill="none" stroke="#0F172A" stroke-width="2.5" stroke-linecap="round" />';
+      } else if (av.mouthType === 'happy') {
+        mouthSVG = '<path d="M 145 190 Q 160 206 175 190 Z" fill="#B91C1C" stroke="#0F172A" stroke-width="2" />';
+      } else if (av.mouthType === 'cool') {
+        mouthSVG = '<path d="M 148 196 Q 160 195 174 191" fill="none" stroke="#0F172A" stroke-width="2.5" stroke-linecap="round" />';
+      }
+
+      let hairSVG = '';
+      if (av.hairLength === 'short') {
+        hairSVG = '<path d="M 98 138 C 95 100, 115 65, 160 65 C 205 65, 225 100, 222 138 C 220 115, 210 95, 195 90 C 180 85, 175 105, 155 102 C 135 100, 130 92, 115 100 Z" fill="' + hairColors.base + '" />';
+      } else if (av.hairLength === 'long') {
+        hairSVG = '<path d="M 102 130 C 92 165, 88 220, 96 265 C 102 268, 115 260, 116 230 C 117 190, 110 160, 115 130 Z" fill="' + hairColors.base + '" />' +
+                  '<path d="M 218 130 C 228 165, 232 220, 224 265 C 218 268, 205 260, 204 230 C 203 190, 210 160, 205 130 Z" fill="' + hairColors.base + '" />' +
+                  '<path d="M 98 135 C 95 90, 120 65, 160 65 C 200 65, 225 90, 222 135 C 215 105, 195 90, 160 90 C 125 90, 105 105, 98 135 Z" fill="' + hairColors.base + '" />';
+      } else if (av.hairLength === 'curly') {
+        hairSVG = '<path d="M 96 142 C 88 110, 100 70, 148 55 C 182 56, 228 78, 224 146 C 218 126, 185 96, 148 100 C 114 102, 100 128, 96 142 Z" fill="' + hairColors.base + '" />' +
+                  '<circle cx="132" cy="74" r="8" fill="' + hairColors.highlight + '" opacity="0.6" />' +
+                  '<circle cx="162" cy="68" r="9" fill="' + hairColors.highlight + '" opacity="0.6" />' +
+                  '<circle cx="190" cy="74" r="8" fill="' + hairColors.highlight + '" opacity="0.6" />';
+      } else {
+        hairSVG = '<path d="M 98 140 C 96 90, 120 66, 160 66 C 200 66, 224 90, 222 140 C 218 110, 204 94, 160 94 C 116 94, 102 110, 98 140 Z" fill="' + hairColors.base + '" />' +
+                  '<path d="M 100 120 L 106 195 L 115 190 Z" fill="' + hairColors.base + '" /><path d="M 220 120 L 214 195 L 205 190 Z" fill="' + hairColors.base + '" />';
+      }
+
+      let accSVG = '';
+      if (av.accessoryType === 'glasses') {
+        accSVG = '<rect x="116" y="140" width="32" height="24" rx="6" fill="none" stroke="#0F172A" stroke-width="3" />' +
+                 '<rect x="172" y="140" width="32" height="24" rx="6" fill="none" stroke="#0F172A" stroke-width="3" />' +
+                 '<line x1="148" y1="148" x2="172" y2="148" stroke="#0F172A" stroke-width="3" />';
+      } else if (av.accessoryType === 'headphones') {
+        accSVG = '<path d="M 94 150 C 94 65, 226 65, 226 150" fill="none" stroke="#6366F1" stroke-width="5" />' +
+                 '<rect x="87" y="136" width="14" height="34" rx="7" fill="#1E293B" stroke="#6366F1" stroke-width="2" />' +
+                 '<rect x="219" y="136" width="14" height="34" rx="7" fill="#1E293B" stroke="#6366F1" stroke-width="2" />';
+      } else if (av.accessoryType === 'hat') {
+        accSVG = '<path d="M 98 120 C 95 62, 130 50, 160 50 C 190 50, 225 62, 222 120 Z" fill="#334155" />' +
+                 '<rect x="94" y="108" width="132" height="22" rx="6" fill="#1E293B" />' +
+                 '<rect x="146" y="112" width="28" height="14" rx="2" fill="#EF4444" />';
+      } else if (av.accessoryType === 'earrings') {
+        accSVG = '<circle cx="103" cy="168" r="5" fill="none" stroke="#FACC15" stroke-width="2.5" />' +
+                 '<circle cx="217" cy="168" r="5" fill="none" stroke="#FACC15" stroke-width="2.5" />';
+      } else if (av.accessoryType === 'backpack') {
+        accSVG = '<line x1="104" y1="235" x2="115" y2="300" stroke="#38BDF8" stroke-width="6" />' +
+                 '<line x1="216" y1="235" x2="205" y2="300" stroke="#38BDF8" stroke-width="6" />';
+      }
+
+      return `
+        <svg viewBox="0 0 320 320" class="${sizeClass} drop-shadow-xl select-none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="160" cy="160" r="148" fill="#1E1B4B" />
+          <circle cx="160" cy="160" r="147" fill="none" stroke="#4F46E5" stroke-width="2" stroke-opacity="0.4" />
+          <path d="M 142 195 L 142 245 C 142 250, 178 250, 178 245 L 178 195 Z" fill="${skinColors.shadow}" />
+          ${clothesSVG}
+          <!-- Ears -->
+          <ellipse cx="103" cy="155" rx="8" ry="14" fill="${skinColors.base}" />
+          <ellipse cx="217" cy="155" rx="8" ry="14" fill="${skinColors.base}" />
+          ${facePath}
+          <!-- Eyebrows -->
+          <path d="M 120 134 Q 134 128 146 133" fill="none" stroke="${hairColors.base}" stroke-width="3" stroke-linecap="round" />
+          <path d="M 174 133 Q 186 128 200 134" fill="none" stroke="${hairColors.base}" stroke-width="3" stroke-linecap="round" />
+          ${eyesSVG}
+          ${mouthSVG}
+          ${hairSVG}
+          ${accSVG}
+        </svg>
+      `;
+    }
+
+    function getGeneratedSentence() {
+      const hair = `${avatar.hairLength} ${avatar.hairColor} hair`;
+      const eyes = `${avatar.eyeSize} ${avatar.eyeColor} eyes`;
+      const mouth = avatar.mouthType === 'big-smile' ? 'a big smile' : (avatar.mouthType === 'small-smile' ? 'a small smile' : 'a cool look');
+      const clothes = `a ${avatar.clothesColor} ${avatar.clothesType}`;
+      if (currentLevel === 1) {
+        return {
+          sentence1: `My avatar has ${hair}, ${eyes}, and ${mouth}.`,
+          fullText: `My avatar has ${hair}, ${eyes}, and ${mouth}.`
+        };
+      } else {
+        const s1 = `My avatar has ${hair} and ${eyes}.`;
+        const s2 = `I chose ${clothes} because I think it looks ${avatar.personalityReason || 'cool'}.`;
+        return {
+          sentence1: s1,
+          sentence2: s2,
+          fullText: `${s1} ${s2}`
+        };
+      }
+    }
+
+    // Step Rendering Router
+    function render() {
+      const container = document.getElementById('appContainer');
+      if (currentStep === 'start') {
+        container.innerHTML = `
+          <div class="text-center py-6">
+            <span class="inline-block px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-bold uppercase tracking-wider mb-4">
+              ✨ Taiwan 7th Grade English · Standalone Edition
+            </span>
+            <h1 class="text-4xl sm:text-5xl md:text-6xl font-black text-white tracking-tight uppercase">
+              CREATE YOUR OWN <span class="text-indigo-400">AVATAR</span>
+            </h1>
+            <div class="mt-4 text-slate-300 text-base sm:text-lg font-medium space-y-1">
+              <p>Build your character.</p>
+              <p>Learn English.</p>
+              <p class="text-indigo-300 font-bold">Tell us about your avatar.</p>
+            </div>
+
+            <div class="flex items-center justify-center gap-6 my-8">
+              <div class="cursor-pointer" onclick="speakText('My avatar has short black hair, big blue eyes, and a red hoodie.')">
+                ${getAvatarSVG(avatar, 'w-36 h-36')}
+                <span class="text-[10px] text-slate-400 block mt-1">Tap to Listen</span>
+              </div>
+            </div>
+
+            <div class="max-w-xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 text-left">
+              <button onclick="currentLevel=1; updateHeaderLevelButton(); playSelectSound(); render();" class="p-5 rounded-2xl border ${currentLevel===1 ? 'bg-slate-800 border-indigo-500 ring-2 ring-indigo-500/40' : 'bg-slate-900 border-slate-800'}">
+                <span class="text-xs font-bold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 uppercase">Level 1</span>
+                <h3 class="text-xl font-bold text-white mt-2">Easy English</h3>
+                <p class="text-xs text-slate-400 mt-1">Short words and simple sentences.</p>
+              </button>
+
+              <button onclick="currentLevel=2; updateHeaderLevelButton(); playSelectSound(); render();" class="p-5 rounded-2xl border ${currentLevel===2 ? 'bg-slate-800 border-amber-500 ring-2 ring-amber-500/40' : 'bg-slate-900 border-slate-800'}">
+                <span class="text-xs font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 uppercase">Level 2</span>
+                <h3 class="text-xl font-bold text-white mt-2">Challenge</h3>
+                <p class="text-xs text-slate-400 mt-1">More vocabulary and longer sentences (because).</p>
+              </button>
+            </div>
+
+            <button onclick="goToStep('face')" class="px-10 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-lg rounded-2xl shadow-xl shadow-indigo-600/30 transition-all cursor-pointer">
+              START BUILDING (開始創作) →
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      const creatorSteps = ['face', 'eyes', 'hair', 'mouth', 'clothes', 'accessories'];
+      if (creatorSteps.includes(currentStep)) {
+        renderCreatorStep(container);
+        return;
+      }
+
+      if (currentStep === 'quiz') {
+        renderQuiz(container);
+        return;
+      }
+
+      if (currentStep === 'builder') {
+        renderBuilder(container);
+        return;
+      }
+
+      if (currentStep === 'speaking') {
+        renderSpeaking(container);
+        return;
+      }
+
+      if (currentStep === 'complete') {
+        renderComplete(container);
+        return;
+      }
+    }
+
+    function renderCreatorStep(container) {
+      const stepLabels = {
+        face: { title: 'CHOOSE YOUR FACE', desc: 'Face Shape & Skin Tone', audio: 'Choose your face and skin tone' },
+        eyes: { title: 'CHOOSE YOUR EYES', desc: 'Eye Size & Iris Color', audio: 'Choose your eyes' },
+        hair: { title: 'CHOOSE YOUR HAIR', desc: 'Hair Style & Color', audio: 'Choose your hair' },
+        mouth: { title: 'CHOOSE YOUR MOUTH', desc: 'Smile & Expression', audio: 'Choose your mouth' },
+        clothes: { title: 'CHOOSE YOUR CLOTHES', desc: 'Outfit & Colors', audio: 'Choose your clothes' },
+        accessories: { title: 'CHOOSE ACCESSORIES', desc: 'Glasses, Hat, Headphones', audio: 'Choose your accessories' }
+      }[currentStep];
+
+      let optionsHTML = '';
+
+      if (currentStep === 'face') {
+        optionsHTML = `
+          <div class="space-y-4">
+            <label class="text-xs font-bold text-slate-400 uppercase">Face Shape (臉型)</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button onclick="updateAvatarProp('faceShape', 'round', 'round face')" class="p-3 rounded-xl border ${avatar.faceShape==='round'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} font-bold text-sm">Round face</button>
+              <button onclick="updateAvatarProp('faceShape', 'oval', 'oval face')" class="p-3 rounded-xl border ${avatar.faceShape==='oval'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} font-bold text-sm">Oval face</button>
+              <button onclick="updateAvatarProp('faceShape', 'square', 'square face')" class="p-3 rounded-xl border ${avatar.faceShape==='square'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} font-bold text-sm">Square face</button>
+            </div>
+            <label class="text-xs font-bold text-slate-400 uppercase block pt-2">Skin Tone (膚色)</label>
+            <div class="grid grid-cols-4 gap-2">
+              <button onclick="updateAvatarProp('skinTone', 'fair', 'fair skin')" class="p-2 rounded-xl border ${avatar.skinTone==='fair'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} text-xs font-bold">Fair</button>
+              <button onclick="updateAvatarProp('skinTone', 'warm', 'warm skin')" class="p-2 rounded-xl border ${avatar.skinTone==='warm'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} text-xs font-bold">Warm</button>
+              <button onclick="updateAvatarProp('skinTone', 'tan', 'tan skin')" class="p-2 rounded-xl border ${avatar.skinTone==='tan'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} text-xs font-bold">Tan</button>
+              <button onclick="updateAvatarProp('skinTone', 'deep', 'deep skin')" class="p-2 rounded-xl border ${avatar.skinTone==='deep'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} text-xs font-bold">Deep</button>
+            </div>
+          </div>
+        `;
+      } else if (currentStep === 'eyes') {
+        optionsHTML = `
+          <div class="space-y-4">
+            <label class="text-xs font-bold text-slate-400 uppercase">Eye Size (眼睛大小)</label>
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="updateAvatarProp('eyeSize', 'big', 'big eyes')" class="p-3 rounded-xl border ${avatar.eyeSize==='big'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} font-bold">Big eyes</button>
+              <button onclick="updateAvatarProp('eyeSize', 'small', 'small eyes')" class="p-3 rounded-xl border ${avatar.eyeSize==='small'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} font-bold">Small eyes</button>
+            </div>
+            <label class="text-xs font-bold text-slate-400 uppercase block pt-2">Eye Color (眼睛顏色)</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button onclick="updateAvatarProp('eyeColor', 'brown', 'brown eyes')" class="p-2.5 rounded-xl border ${avatar.eyeColor==='brown'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} font-bold text-sm">Brown</button>
+              <button onclick="updateAvatarProp('eyeColor', 'blue', 'blue eyes')" class="p-2.5 rounded-xl border ${avatar.eyeColor==='blue'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} font-bold text-sm">Blue</button>
+              <button onclick="updateAvatarProp('eyeColor', 'green', 'green eyes')" class="p-2.5 rounded-xl border ${avatar.eyeColor==='green'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} font-bold text-sm">Green</button>
+            </div>
+          </div>
+        `;
+      } else if (currentStep === 'hair') {
+        optionsHTML = `
+          <div class="space-y-4">
+            <label class="text-xs font-bold text-slate-400 uppercase">Hair Style (髮型)</label>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <button onclick="updateAvatarProp('hairLength', 'short', 'short hair')" class="p-2.5 rounded-xl border ${avatar.hairLength==='short'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} font-bold text-xs">Short hair</button>
+              <button onclick="updateAvatarProp('hairLength', 'long', 'long hair')" class="p-2.5 rounded-xl border ${avatar.hairLength==='long'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} font-bold text-xs">Long hair</button>
+              <button onclick="updateAvatarProp('hairLength', 'curly', 'curly hair')" class="p-2.5 rounded-xl border ${avatar.hairLength==='curly'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} font-bold text-xs">Curly hair</button>
+              <button onclick="updateAvatarProp('hairLength', 'straight', 'straight hair')" class="p-2.5 rounded-xl border ${avatar.hairLength==='straight'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} font-bold text-xs">Straight hair</button>
+            </div>
+            <label class="text-xs font-bold text-slate-400 uppercase block pt-2">Hair Color (髮色)</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button onclick="updateAvatarProp('hairColor', 'black', 'black hair')" class="p-2.5 rounded-xl border ${avatar.hairColor==='black'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} font-bold text-sm">Black</button>
+              <button onclick="updateAvatarProp('hairColor', 'brown', 'brown hair')" class="p-2.5 rounded-xl border ${avatar.hairColor==='brown'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} font-bold text-sm">Brown</button>
+              <button onclick="updateAvatarProp('hairColor', 'blonde', 'blonde hair')" class="p-2.5 rounded-xl border ${avatar.hairColor==='blonde'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} font-bold text-sm">Blonde</button>
+            </div>
+          </div>
+        `;
+      } else if (currentStep === 'mouth') {
+        optionsHTML = `
+          <div class="space-y-4">
+            <label class="text-xs font-bold text-slate-400 uppercase">Mouth & Expression (微笑與表情)</label>
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="updateAvatarProp('mouthType', 'big-smile', 'big smile')" class="p-3.5 rounded-xl border ${avatar.mouthType==='big-smile'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} font-bold">Big smile</button>
+              <button onclick="updateAvatarProp('mouthType', 'small-smile', 'small smile')" class="p-3.5 rounded-xl border ${avatar.mouthType==='small-smile'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} font-bold">Small smile</button>
+              <button onclick="updateAvatarProp('mouthType', 'happy', 'happy face')" class="p-3.5 rounded-xl border ${avatar.mouthType==='happy'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} font-bold">Happy face</button>
+              <button onclick="updateAvatarProp('mouthType', 'cool', 'cool look')" class="p-3.5 rounded-xl border ${avatar.mouthType==='cool'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} font-bold">Cool look</button>
+            </div>
+          </div>
+        `;
+      } else if (currentStep === 'clothes') {
+        optionsHTML = `
+          <div class="space-y-4">
+            <label class="text-xs font-bold text-slate-400 uppercase">Clothes (服裝)</label>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <button onclick="updateAvatarProp('clothesType', 't-shirt', 'T-shirt')" class="p-2.5 rounded-xl border ${avatar.clothesType==='t-shirt'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} font-bold text-xs">T-shirt</button>
+              <button onclick="updateAvatarProp('clothesType', 'hoodie', 'hoodie')" class="p-2.5 rounded-xl border ${avatar.clothesType==='hoodie'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} font-bold text-xs">Hoodie</button>
+              <button onclick="updateAvatarProp('clothesType', 'jacket', 'jacket')" class="p-2.5 rounded-xl border ${avatar.clothesType==='jacket'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} font-bold text-xs">Jacket</button>
+              <button onclick="updateAvatarProp('clothesType', 'school-uniform', 'school uniform')" class="p-2.5 rounded-xl border ${avatar.clothesType==='school-uniform'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} font-bold text-xs">School uniform</button>
+            </div>
+            <label class="text-xs font-bold text-slate-400 uppercase block pt-2">Color (顏色)</label>
+            <div class="grid grid-cols-5 gap-2">
+              <button onclick="updateAvatarProp('clothesColor', 'black', 'black')" class="p-2 rounded-xl border ${avatar.clothesColor==='black'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} text-xs font-bold">Black</button>
+              <button onclick="updateAvatarProp('clothesColor', 'blue', 'blue')" class="p-2 rounded-xl border ${avatar.clothesColor==='blue'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} text-xs font-bold">Blue</button>
+              <button onclick="updateAvatarProp('clothesColor', 'red', 'red')" class="p-2 rounded-xl border ${avatar.clothesColor==='red'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} text-xs font-bold">Red</button>
+              <button onclick="updateAvatarProp('clothesColor', 'green', 'green')" class="p-2 rounded-xl border ${avatar.clothesColor==='green'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} text-xs font-bold">Green</button>
+              <button onclick="updateAvatarProp('clothesColor', 'white', 'white')" class="p-2 rounded-xl border ${avatar.clothesColor==='white'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} text-xs font-bold">White</button>
+            </div>
+            ${currentLevel === 2 ? `
+              <label class="text-xs font-bold text-amber-400 uppercase block pt-2">Level 2 Reason (為什麼選擇？)</label>
+              <div class="grid grid-cols-3 gap-2">
+                <button onclick="updateAvatarProp('personalityReason', 'cool', 'Because it looks cool.')" class="p-2 rounded-xl border ${avatar.personalityReason==='cool'?'border-amber-500 bg-amber-500/20 text-amber-300':'border-slate-700 bg-slate-900 text-slate-300'} text-xs font-bold">Cool</button>
+                <button onclick="updateAvatarProp('personalityReason', 'friendly', 'Because it looks friendly.')" class="p-2 rounded-xl border ${avatar.personalityReason==='friendly'?'border-amber-500 bg-amber-500/20 text-amber-300':'border-slate-700 bg-slate-900 text-slate-300'} text-xs font-bold">Friendly</button>
+                <button onclick="updateAvatarProp('personalityReason', 'confident', 'Because it looks confident.')" class="p-2 rounded-xl border ${avatar.personalityReason==='confident'?'border-amber-500 bg-amber-500/20 text-amber-300':'border-slate-700 bg-slate-900 text-slate-300'} text-xs font-bold">Confident</button>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      } else if (currentStep === 'accessories') {
+        optionsHTML = `
+          <div class="space-y-4">
+            <label class="text-xs font-bold text-slate-400 uppercase">Accessories (配件飾品)</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button onclick="updateAvatarProp('accessoryType', 'none', 'No accessories')" class="p-3 rounded-xl border ${avatar.accessoryType==='none'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} text-xs font-bold">None</button>
+              <button onclick="updateAvatarProp('accessoryType', 'glasses', 'glasses')" class="p-3 rounded-xl border ${avatar.accessoryType==='glasses'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} text-xs font-bold">Glasses</button>
+              <button onclick="updateAvatarProp('accessoryType', 'hat', 'streetwear beanie hat')" class="p-3 rounded-xl border ${avatar.accessoryType==='hat'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} text-xs font-bold">Beanie Hat</button>
+              <button onclick="updateAvatarProp('accessoryType', 'headphones', 'headphones')" class="p-3 rounded-xl border ${avatar.accessoryType==='headphones'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} text-xs font-bold">Headphones</button>
+              <button onclick="updateAvatarProp('accessoryType', 'earrings', 'earrings')" class="p-3 rounded-xl border ${avatar.accessoryType==='earrings'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} text-xs font-bold">Earrings</button>
+              <button onclick="updateAvatarProp('accessoryType', 'backpack', 'backpack')" class="p-3 rounded-xl border ${avatar.accessoryType==='backpack'?'border-indigo-500 bg-indigo-600/20 text-white':'border-slate-700 bg-slate-900 text-slate-300'} text-xs font-bold">Backpack</button>
+            </div>
+          </div>
+        `;
+      }
+
+      container.innerHTML = `
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div class="lg:col-span-5 flex flex-col items-center bg-slate-800/80 border border-slate-700 rounded-3xl p-6 shadow-xl">
+            ${getAvatarSVG(avatar, 'w-60 h-60')}
+            <span class="text-xs font-semibold text-indigo-400 mt-4 uppercase">Live Avatar Preview</span>
+          </div>
+
+          <div class="lg:col-span-7 bg-slate-800/80 border border-slate-700 rounded-3xl p-6 shadow-xl space-y-6">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+              <div>
+                <h2 class="text-xl font-black text-white">${stepLabels.title}</h2>
+                <p class="text-xs text-slate-400">${stepLabels.desc}</p>
+              </div>
+              <button onclick="speakText('${stepLabels.audio}')" class="px-3 py-1.5 bg-indigo-600/30 text-indigo-300 rounded-xl text-xs font-bold flex items-center gap-1">
+                🔊 Listen
+              </button>
+            </div>
+
+            ${optionsHTML}
+
+            <div class="pt-4 border-t border-slate-700 flex items-center justify-between">
+              <button onclick="stepNav(-1)" class="px-5 py-2.5 rounded-xl font-bold text-sm bg-slate-900 hover:bg-slate-700 text-slate-300">
+                ← BACK
+              </button>
+              <button onclick="stepNav(1)" class="px-7 py-2.5 rounded-xl font-bold text-sm bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg">
+                NEXT →
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function updateAvatarProp(prop, val, audio) {
+      playSelectSound();
+      avatar[prop] = val;
+      render();
+      if (audio) speakText(audio);
+    }
+
+    function stepNav(dir) {
+      playSelectSound();
+      const steps = ['face', 'eyes', 'hair', 'mouth', 'clothes', 'accessories'];
+      const idx = steps.indexOf(currentStep);
+      if (dir === 1) {
+        if (idx < steps.length - 1) {
+          currentStep = steps[idx + 1];
+        } else {
+          currentStep = 'quiz';
+        }
+      } else {
+        if (idx > 0) {
+          currentStep = steps[idx - 1];
+        } else {
+          currentStep = 'start';
+        }
+      }
+      render();
+    }
+
+    function renderQuiz(container) {
+      const qText = currentLevel === 1 ? 'Find the avatar with "curly hair":' : 'Find the avatar with "short black hair and a red hoodie":';
+      const audioPrompt = currentLevel === 1 ? 'Find the avatar with curly hair' : 'Find the avatar with short black hair and a red hoodie';
+
+      const optA = { ...avatar, hairLength: 'straight', hairColor: 'blonde' };
+      const optB = { ...avatar, hairLength: 'curly', hairColor: 'black', clothesType: 'hoodie', clothesColor: 'red' };
+      const optC = { ...avatar, hairLength: 'short', hairColor: 'brown', clothesType: 'jacket', clothesColor: 'blue' };
+
+      container.innerHTML = `
+        <div class="max-w-2xl mx-auto bg-slate-800 border border-slate-700 rounded-3xl p-6 text-center">
+          <span class="text-xs font-bold uppercase tracking-wider text-indigo-400">Reading Checkpoint</span>
+          <h2 class="text-2xl font-black text-white mt-1 mb-2">${qText}</h2>
+          <button onclick="speakText('${audioPrompt}')" class="px-3 py-1 bg-indigo-600/30 text-indigo-300 rounded-lg text-xs font-bold mb-6">
+            🔊 Listen to Question
+          </button>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <button onclick="handleQuizAnswer(false)" class="p-4 bg-slate-900 rounded-2xl border border-slate-700 hover:border-slate-500 flex flex-col items-center">
+              <span class="text-xs font-bold text-slate-400 mb-2">Option A</span>
+              ${getAvatarSVG(optA, 'w-32 h-32')}
+            </button>
+            <button onclick="handleQuizAnswer(true)" class="p-4 bg-slate-900 rounded-2xl border border-slate-700 hover:border-indigo-500 flex flex-col items-center">
+              <span class="text-xs font-bold text-slate-400 mb-2">Option B</span>
+              ${getAvatarSVG(optB, 'w-32 h-32')}
+            </button>
+            <button onclick="handleQuizAnswer(false)" class="p-4 bg-slate-900 rounded-2xl border border-slate-700 hover:border-slate-500 flex flex-col items-center">
+              <span class="text-xs font-bold text-slate-400 mb-2">Option C</span>
+              ${getAvatarSVG(optC, 'w-32 h-32')}
+            </button>
+          </div>
+
+          <div id="quizFeedback" class="hidden p-4 rounded-xl mb-4 font-bold text-sm"></div>
+
+          <button id="quizNextBtn" onclick="goToStep('builder')" class="hidden px-8 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg">
+            Continue to Sentence Builder →
+          </button>
+        </div>
+      `;
+    }
+
+    function handleQuizAnswer(isCorrect) {
+      const fb = document.getElementById('quizFeedback');
+      const nextBtn = document.getElementById('quizNextBtn');
+      fb.classList.remove('hidden');
+      if (isCorrect) {
+        playSuccessChime();
+        fb.className = 'p-4 rounded-xl mb-4 font-bold text-sm bg-emerald-950/60 text-emerald-400 border border-emerald-500';
+        fb.textContent = '🎉 Correct! You read the English description perfectly!';
+        nextBtn.classList.remove('hidden');
+      } else {
+        playSelectSound();
+        fb.className = 'p-4 rounded-xl mb-4 font-bold text-sm bg-rose-950/60 text-rose-400 border border-rose-500';
+        fb.textContent = 'Try again! Look closely at the English description.';
+      }
+    }
+
+    // Sentence Builder
+    let builderTokens = [];
+    let placedTokens = [];
+
+    function renderBuilder(container) {
+      const sentData = getGeneratedSentence();
+      const hair = `${avatar.hairLength} ${avatar.hairColor} hair`;
+      const eyes = `${avatar.eyeSize} ${avatar.eyeColor} eyes`;
+      const mouth = avatar.mouthType === 'big-smile' ? 'a big smile.' : 'a cool look.';
+
+      builderTokens = ['My avatar', 'has', hair, eyes, 'and', mouth];
+      placedTokens = [];
+
+      container.innerHTML = `
+        <div class="max-w-3xl mx-auto bg-slate-800 border border-slate-700 rounded-3xl p-6">
+          <div class="text-center mb-6">
+            <span class="text-xs font-bold text-indigo-400 uppercase">Interactive Sentence Builder</span>
+            <h2 class="text-2xl font-black text-white mt-1">Tap words to build your sentence</h2>
+            <p class="text-xs text-slate-400">點擊下方片語卡片，依順序組成句子（免打字）</p>
+          </div>
+
+          <div class="flex justify-center mb-6">
+            ${getAvatarSVG(avatar, 'w-44 h-44')}
+          </div>
+
+          <div id="placedSlot" class="min-h-[56px] p-3 rounded-xl bg-slate-900 border border-slate-700 flex flex-wrap gap-2 items-center mb-4">
+            <span class="text-xs text-slate-500 italic">Tap words below to place here...</span>
+          </div>
+
+          <div id="bankZone" class="flex flex-wrap gap-2 mb-6">
+            ${builderTokens.map((t, idx) => `
+              <button onclick="addToken('${t}', this)" class="px-3 py-1.5 bg-slate-700 hover:bg-indigo-600 text-white rounded-lg text-sm font-medium">
+                ${t}
+              </button>
+            `).join('')}
+          </div>
+
+          <div class="flex items-center justify-between">
+            <button onclick="renderBuilder(document.getElementById('appContainer'))" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-xl text-xs font-bold">
+              🔄 Reset
+            </button>
+            <button id="builderNextBtn" onclick="goToStep('speaking')" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg">
+              Next: Speaking Challenge →
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function addToken(word, btn) {
+      playSelectSound();
+      speakText(word);
+      placedTokens.push(word);
+      btn.style.display = 'none';
+
+      const slot = document.getElementById('placedSlot');
+      slot.innerHTML = placedTokens.map(w => `
+        <span class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-semibold">${w}</span>
+      `).join(' ');
+
+      if (placedTokens.length === builderTokens.length) {
+        playSuccessChime();
+      }
+    }
+
+    // Speaking Challenge
+    function renderSpeaking(container) {
+      const sentData = getGeneratedSentence();
+      container.innerHTML = `
+        <div class="max-w-2xl mx-auto bg-slate-800 border border-slate-700 rounded-3xl p-6 sm:p-8 text-center">
+          <span class="text-xs font-bold uppercase tracking-wider text-indigo-400">Step 8 · Speaking Challenge</span>
+          <h2 class="text-3xl font-black text-white mt-1 mb-6">SPEAKING CHALLENGE</h2>
+
+          <div class="flex justify-center mb-6">
+            ${getAvatarSVG(avatar, 'w-56 h-56')}
+          </div>
+
+          <div class="bg-slate-900 rounded-2xl p-5 border border-slate-700 mb-5 text-left">
+            <span class="text-xs font-bold uppercase text-slate-400">Say This:</span>
+            <p class="text-xl sm:text-2xl font-bold text-white mt-2 leading-relaxed">“${sentData.sentence1}”</p>
+            ${sentData.sentence2 ? `<p class="text-xl sm:text-2xl font-bold text-amber-300 mt-2 leading-relaxed">“${sentData.sentence2}”</p>` : ''}
+          </div>
+
+          <button onclick="speakText('${sentData.fullText}')" class="w-full py-3.5 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 rounded-xl font-bold mb-6">
+            🔊 LISTEN (點擊聽示範發音)
+          </button>
+
+          <div class="bg-slate-900/60 rounded-2xl p-6 border border-slate-700">
+            <h3 class="text-lg font-black text-white">YOUR TURN!</h3>
+            <p class="text-xs text-slate-400 mt-1 mb-4">Say it out loud to your teacher or in Google Meet!</p>
+
+            <button onclick="handleSaidIt(this)" class="px-8 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-base rounded-2xl shadow-xl">
+              🎤 I SAID IT! (我念完了！)
+            </button>
+          </div>
+
+          <div class="mt-6 flex justify-end">
+            <button onclick="goToStep('complete')" class="px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl shadow-lg">
+              Finish & View Summary →
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function handleSaidIt(btn) {
+      playCelebrateSound();
+      btn.textContent = '✅ I SAID IT! (Awesome!)';
+      btn.className = 'px-8 py-3.5 bg-emerald-700 text-white font-extrabold text-base rounded-2xl shadow-xl';
+    }
+
+    // Complete Screen
+    function renderComplete(container) {
+      const sentData = getGeneratedSentence();
+      container.innerHTML = `
+        <div class="max-w-2xl mx-auto bg-slate-800 border border-slate-700 rounded-3xl p-6 sm:p-8 text-center shadow-2xl">
+          <span class="text-xs font-bold uppercase text-emerald-400">Mission Accomplished</span>
+          <h1 class="text-3xl sm:text-4xl font-black text-white mt-1 mb-6">🎉 AVATAR COMPLETE!</h1>
+
+          <div class="flex justify-center mb-6">
+            ${getAvatarSVG(avatar, 'w-60 h-60')}
+          </div>
+
+          <div class="bg-slate-900 rounded-2xl p-5 border border-slate-700 mb-6 text-left">
+            <span class="text-xs font-bold uppercase text-indigo-400">YOUR ENGLISH</span>
+            <p class="text-lg sm:text-xl font-bold text-white mt-2 leading-relaxed">“${sentData.sentence1}”</p>
+            ${sentData.sentence2 ? `<p class="text-lg sm:text-xl font-bold text-amber-300 mt-2 leading-relaxed">“${sentData.sentence2}”</p>` : ''}
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 mb-6">
+            <button onclick="speakText('${sentData.fullText}')" class="py-3 bg-indigo-600/30 text-indigo-200 border border-indigo-500/40 rounded-xl font-bold text-xs">
+              🔊 LISTEN AGAIN
+            </button>
+            <button onclick="copyEnglish('${sentData.fullText}')" id="copyBtn" class="py-3 bg-slate-700 text-slate-200 rounded-xl font-bold text-xs">
+              📋 COPY TO CHAT
+            </button>
+          </div>
+
+          <button onclick="goToStep('start')" class="px-8 py-3.5 bg-slate-900 hover:bg-slate-700 border border-slate-600 text-white font-bold rounded-2xl shadow">
+            🔄 CREATE ANOTHER AVATAR
+          </button>
+        </div>
+      `;
+    }
+
+    function copyEnglish(text) {
+      playSelectSound();
+      navigator.clipboard.writeText(text);
+      const btn = document.getElementById('copyBtn');
+      btn.textContent = '✅ COPIED!';
+      setTimeout(() => { btn.textContent = '📋 COPY TO CHAT'; }, 2000);
+    }
+
+    function toggleTeacherMeetModal(show) {
+      playSelectSound();
+      const modal = document.getElementById('teacherModal');
+      const content = document.getElementById('teacherModalContent');
+      if (show) {
+        modal.classList.remove('hidden');
+        const sentData = getGeneratedSentence();
+        content.innerHTML = `
+          <h2 class="text-2xl font-black text-white mb-2">📹 Google Meet Q&A Tips</h2>
+          <p class="text-xs text-slate-400 mb-4">老師在 Meet 線上課問問題時，學生可使用的回答句型：</p>
+          <div class="space-y-3">
+            <div class="p-3 bg-slate-800 rounded-xl border border-slate-700">
+              <span class="text-xs font-bold text-indigo-400">Teacher asks:</span>
+              <p class="text-sm font-semibold text-white">"Tell me about your avatar\'s face and hair!"</p>
+              <span class="text-xs font-bold text-emerald-400 mt-2 block">Student answers:</span>
+              <p class="text-sm font-bold text-emerald-300">“${sentData.sentence1}”</p>
+            </div>
+            ${currentLevel === 2 ? `
+              <div class="p-3 bg-slate-800 rounded-xl border border-slate-700">
+                <span class="text-xs font-bold text-amber-400">Teacher asks:</span>
+                <p class="text-sm font-semibold text-white">"Why did you choose this style?"</p>
+                <span class="text-xs font-bold text-emerald-400 mt-2 block">Student answers:</span>
+                <p class="text-sm font-bold text-emerald-300">“${sentData.sentence2}”</p>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    // Initialize
+    window.addEventListener('DOMContentLoaded', () => {
+      render();
+    });
+  </script>
+</body>
+</html>
